@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A modern, high-precision light-mode weather app providing real-time conditions, hourly forecasts, and 7-day outlooks for any city worldwide.">
+  <title>Aetheria Weather | Light-Mode Atmospheric Dashboard</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Outfit', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            body: ['Plus Jakarta Sans', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+            }
+          },
+          boxShadow: {
+            'glass': '0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(226, 232, 240, 0.8)',
+            'glass-hover': '0 20px 35px -5px rgba(14, 165, 233, 0.08), 0 0 0 1px rgba(14, 165, 233, 0.3)',
+            'subtle': '0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 0 0 1px rgba(226, 232, 240, 0.6)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Custom Styles (Animations, Canvas, Particles) -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 font-body min-h-screen relative overflow-x-hidden antialiased selection:bg-sky-500 selection:text-white">
+  <!-- Ambient Animated Background Canvas -->
+  <canvas id="weatherCanvas" class="weather-canvas" aria-hidden="true"></canvas>
+  <div class="ambient-glow glow-1" aria-hidden="true"></div>
+  <div class="ambient-glow glow-2" aria-hidden="true"></div>
+
+  <div class="app-container max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-8 relative z-10">
+    <!-- Header with Branding & Controls -->
+    <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="brand flex items-center gap-3.5">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-sky-500/20 text-white">
+          <svg class="w-6 h-6 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1 class="font-display text-2xl font-bold tracking-tight text-slate-900 leading-tight">
+            Aetheria <span class="bg-gradient-to-r from-sky-600 to-indigo-600 bg-clip-text text-transparent">Weather</span>
+          </h1>
+          <p class="text-xs uppercase tracking-wider font-semibold text-slate-500">Atmospheric Intelligence</p>
+        </div>
+      </div>
+
+      <div class="header-controls flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+        <!-- Geolocation Button -->
+        <button id="geoBtn" class="flex items-center gap-2 bg-white/90 hover:bg-white border border-slate-200/90 hover:border-sky-300 text-slate-700 hover:text-sky-600 px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0" title="Use Current Location" aria-label="Use Current Location">
+          <svg class="w-4 h-4 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>
+          </svg>
+          <span class="btn-label font-medium">My Location</span>
+        </button>
+
+        <!-- Temperature Unit Toggle -->
+        <div class="unit-toggle flex bg-slate-200/70 p-1 rounded-xl border border-slate-200/80 shadow-inner" role="group" aria-label="Temperature unit selection">
+          <button id="unitC" class="unit-btn active px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold font-display transition-all duration-200" data-unit="C" aria-pressed="true">°C</button>
+          <button id="unitF" class="unit-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold font-display text-slate-600 hover:text-slate-900 transition-all duration-200" data-unit="F" aria-pressed="false">°F</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Search Section -->
+    <section class="search-section flex flex-col gap-3.5" aria-label="City Search">
+      <div class="search-box-wrapper relative w-full">
+        <div class="search-box flex items-center bg-white/95 border border-slate-200/90 rounded-2xl p-2 pl-4 shadow-glass transition-all duration-200 focus-within:border-sky-400 focus-within:ring-4 focus-within:ring-sky-100">
+          <svg class="w-5 h-5 text-sky-500 mr-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.3-4.3"/>
+          </svg>
+          <input 
+            type="text" 
+            id="cityInput" 
+            class="flex-1 bg-transparent border-none outline-none text-slate-900 text-base placeholder-slate-400 font-body py-1.5"
+            placeholder="Search any city, region or country..." 
+            autocomplete="off" 
+            spellcheck="false"
+            aria-label="City search input"
+          >
+          <button id="clearSearchBtn" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors mr-1" aria-label="Clear search" style="display: none;">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+          <button id="searchSubmitBtn" class="flex items-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-display font-semibold text-sm px-5 py-2.5 rounded-xl shadow-md shadow-sky-500/25 transition-all duration-200 hover:-translate-y-0.5" aria-label="Search">
+            <span>Search</span>
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Search Suggestions Dropdown -->
+        <div id="searchSuggestions" class="search-suggestions absolute top-[calc(100%+8px)] left-0 right-0 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden max-h-80 overflow-y-auto divide-y divide-slate-100" style="display: none;"></div>
+      </div>
+
+      <!-- Quick City Select Chips -->
+      <div class="quick-cities flex items-center flex-wrap gap-2 pt-1 px-1" aria-label="Popular cities">
+        <span class="text-xs uppercase font-bold tracking-wider text-slate-400 mr-1">Trending:</span>
+        <div class="quick-chips flex flex-wrap gap-2">
+          <button class="city-chip active" data-city="Chandigarh" data-lat="30.7333" data-lon="76.7794" data-country="India">Chandigarh</button>
+          <button class="city-chip" data-city="New York" data-lat="40.7128" data-lon="-74.0060" data-country="United States">New York</button>
+          <button class="city-chip" data-city="London" data-lat="51.5074" data-lon="-0.1278" data-country="United Kingdom">London</button>
+          <button class="city-chip" data-city="Tokyo" data-lat="35.6762" data-lon="139.6503" data-country="Japan">Tokyo</button>
+          <button class="city-chip" data-city="Dubai" data-lat="25.2048" data-lon="55.2708" data-country="United Arab Emirates">Dubai</button>
+          <button class="city-chip" data-city="Paris" data-lat="48.8566" data-lon="2.3522" data-country="France">Paris</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Notification / Status Banner -->
+    <div id="statusBanner" class="status-banner" style="display: none;" role="status" aria-live="polite">
+      <span class="status-icon"></span>
+      <span class="status-message font-medium"></span>
+    </div>
+
+    <!-- Main Dashboard Grid -->
+    <main id="weatherDashboard" class="weather-dashboard grid grid-cols-1 lg:grid-cols-12 gap-6 relative">
+      <!-- Loading Skeleton Overlay -->
+      <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <p class="font-medium text-slate-700">Updating atmospheric telemetry...</p>
+      </div>
+
+      <!-- Left Column: Hero Current Weather Card (7 cols on lg) -->
+      <section class="current-weather-card lg:col-span-7 bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-7 sm:p-9 shadow-glass hover:shadow-glass-hover transition-all duration-300 flex flex-col justify-between relative overflow-hidden" id="currentWeatherCard">
+        <div class="card-glow-badge absolute top-6 right-6 bg-sky-50 text-sky-700 border border-sky-200 px-3 py-1 rounded-full text-xs font-semibold tracking-wide capitalize" id="conditionBadge">
+          Clear Sky
+        </div>
+
+        <div class="card-top flex items-start justify-between gap-4">
+          <div class="location-meta">
+            <h2 id="cityName" class="city-name font-display text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mb-1">
+              Chandigarh
+            </h2>
+            <div class="location-sub flex items-center gap-2 text-slate-500 text-sm sm:text-base font-medium">
+              <span id="countryName" class="country-name">India</span>
+              <span class="dot-separator text-slate-300">•</span>
+              <span id="localTime" class="local-time font-semibold text-slate-600">--:--</span>
+            </div>
+          </div>
+          <div class="status-pill inline-flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 py-1 rounded-full text-xs font-medium text-slate-600 mt-10" id="dayNightPill">
+            <span class="pill-indicator w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></span>
+            <span id="dayNightText">Daytime</span>
+          </div>
+        </div>
+
+        <div class="temp-hero flex items-center justify-between my-6">
+          <div class="temp-display flex items-start font-display leading-none">
+            <span id="currentTemp" class="temp-value text-7xl sm:text-8xl font-extrabold tracking-tighter bg-gradient-to-b from-slate-900 to-slate-700 bg-clip-text text-transparent">28</span>
+            <span class="temp-unit-symbol text-4xl sm:text-5xl font-light text-sky-500 ml-1">°</span>
+          </div>
+          <div class="weather-visual">
+            <div id="mainWeatherIcon" class="hero-icon-container w-28 h-28 sm:w-36 sm:h-36 flex items-center justify-center filter drop-shadow-md">
+              <!-- Animated SVG inserted dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <div class="weather-summary">
+          <p id="weatherDesc" class="weather-desc font-display text-xl sm:text-2xl font-bold text-slate-800 mb-1 capitalize">Sunny & Clear</p>
+          <div class="feels-like-row flex items-center flex-wrap gap-3 text-slate-600 text-sm sm:text-base">
+            <span>Feels like <strong id="feelsLikeTemp" class="text-slate-900 font-semibold">29°</strong></span>
+            <span class="temp-range inline-flex gap-2.5 bg-slate-100 border border-slate-200/80 px-2.5 py-0.5 rounded-lg text-xs sm:text-sm font-semibold">
+              <span class="text-emerald-600">↑ <span id="todayMax">32°</span></span>
+              <span class="text-sky-600">↓ <span id="todayMin">21°</span></span>
+            </span>
+          </div>
+        </div>
+
+        <div class="last-updated flex items-center gap-1.5 text-xs text-slate-400 mt-6 pt-4 border-t border-slate-100">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span>Live telemetry synced</span>
+        </div>
+      </section>
+
+      <!-- Right Column: Telemetry Metrics Grid (5 cols on lg) -->
+      <section class="telemetry-grid lg:col-span-5 grid grid-cols-2 gap-4" aria-label="Detailed Weather Metrics">
+        <!-- Wind Speed & Direction -->
+        <div class="metric-card bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-2xl p-5 shadow-glass hover:shadow-glass-hover transition-all duration-200 flex flex-col justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center">
+              <svg class="w-5 h-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/>
+                <path d="M9.6 4.6A2 2 0 1 1 11 8H2"/>
+                <path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
+              </svg>
+            </div>
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Wind Speed</span>
+          </div>
+          <div>
+            <div class="flex items-baseline gap-1">
+              <span id="windSpeed" class="font-display text-3xl font-bold text-slate-900 leading-none">14</span>
+              <span id="windUnit" class="text-xs font-semibold text-slate-400">km/h</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-medium text-slate-500 mt-1">
+              <span id="windDirection" class="text-sky-600 font-bold">ESE</span>
+              <span>Gentle breeze</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Relative Humidity -->
+        <div class="metric-card bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-2xl p-5 shadow-glass hover:shadow-glass-hover transition-all duration-200 flex flex-col justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
+              <svg class="w-5 h-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+              </svg>
+            </div>
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Humidity</span>
+          </div>
+          <div>
+            <div class="flex items-baseline gap-1">
+              <span id="humidityVal" class="font-display text-3xl font-bold text-slate-900 leading-none">48</span>
+              <span class="text-xs font-semibold text-slate-400">%</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-medium text-slate-500 mt-1">
+              <span id="humidityDesc" class="text-indigo-600 font-bold">Comfortable</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Precipitation / Rain probability -->
+        <div class="metric-card bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-2xl p-5 shadow-glass hover:shadow-glass-hover transition-all duration-200 flex flex-col justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
+              <svg class="w-5 h-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="16" y1="13" x2="16" y2="21"/>
+                <line x1="8" y1="13" x2="8" y2="21"/>
+                <line x1="12" y1="15" x2="12" y2="23"/>
+                <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/>
+              </svg>
+            </div>
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Precipitation</span>
+          </div>
+          <div>
+            <div class="flex items-baseline gap-1">
+              <span id="precipVal" class="font-display text-3xl font-bold text-slate-900 leading-none">0.0</span>
+              <span class="text-xs font-semibold text-slate-400">mm</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-medium text-slate-500 mt-1">
+              <span id="precipDesc" class="text-slate-500">No rain expected</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Atmospheric Pressure -->
+        <div class="metric-card bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-2xl p-5 shadow-glass hover:shadow-glass-hover transition-all duration-200 flex flex-col justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center">
+              <svg class="w-5 h-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="m16 12-4-4-4 4"/>
+                <path d="M12 16V8"/>
+              </svg>
+            </div>
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Pressure</span>
+          </div>
+          <div>
+            <div class="flex items-baseline gap-1">
+              <span id="pressureVal" class="font-display text-3xl font-bold text-slate-900 leading-none">1014</span>
+              <span class="text-xs font-semibold text-slate-400">hPa</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-medium text-slate-500 mt-1">
+              <span class="text-emerald-700 font-medium">Standard level</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 24-Hour Forecast Section (Full Width) -->
+      <section class="forecast-section hourly-section lg:col-span-12 bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-glass" aria-label="Hourly Forecast">
+        <div class="section-header flex items-center justify-between mb-5">
+          <div class="header-title flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
+              <svg class="w-4 h-4 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 14 14"/>
+              </svg>
+            </div>
+            <h3 class="font-display text-lg font-bold text-slate-900">24-Hour Timeline</h3>
+          </div>
+          <span class="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1 rounded-full">Hourly Evolution</span>
+        </div>
+        <div class="hourly-scroll-container flex gap-3.5 overflow-x-auto pb-3 pt-1" id="hourlyForecastContainer">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- 7-Day Extended Forecast Section (Full Width) -->
+      <section class="forecast-section weekly-section lg:col-span-12 bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-glass" aria-label="7-Day Forecast">
+        <div class="section-header flex items-center justify-between mb-5">
+          <div class="header-title flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <svg class="w-4 h-4 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </div>
+            <h3 class="font-display text-lg font-bold text-slate-900">7-Day Extended Outlook</h3>
+          </div>
+          <span class="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1 rounded-full">Weekly Forecast</span>
+        </div>
+        <div class="weekly-list flex flex-col gap-2.5" id="weeklyForecastContainer">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center pt-4 border-t border-slate-200 text-xs text-slate-500 font-medium">
+      <p>Powered by Open-Meteo API • Designed with Tailwind CSS & Clean White Aesthetics • Real-Time Telemetry</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
